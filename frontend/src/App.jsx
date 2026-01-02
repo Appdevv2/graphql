@@ -106,31 +106,37 @@ const App = () => {
     setAuthLoading(true);
     console.log("authData", authData);
 
-    fetch("http://localhost:3005/auth/login", {
+    const graphqlQuery = {
+      query: `
+      { login (email: "${authData.email}", password: "${authData.password}") { token userId } }
+      `,
+    };
+
+    fetch("http://localhost:3005/graphql", {
       method: "POST",
-      body: JSON.stringify({
-        email: authData.email,
-        password: authData.password,
-      }),
+      body: JSON.stringify(graphqlQuery),
       headers: {
         "Content-Type": "application/json",
       },
     })
       .then((res) => {
-        if (res.status === 422) throw new Error("Validation failed.");
-        if (res.status !== 200 && res.status !== 201) {
-          throw new Error("Could not authenticate you!");
-        }
         return res.json();
       })
       .then((resData) => {
+        console.log("res data", resData);
+        const { data } = resData;
+        if (resData.errors && resData.errors[0].status === 422)
+          throw new Error("Validation failed.");
+        if (resData.errors) {
+          throw new Error("Could not authenticate you!");
+        }
         setIsAuth(true);
-        setToken(resData.token);
-        setUserId(resData.userId);
+        setToken(data.login.token);
+        setUserId(data.login.userId);
         setAuthLoading(false);
 
-        localStorage.setItem("token", resData.token);
-        localStorage.setItem("userId", resData.userId);
+        localStorage.setItem("token", data.login.token);
+        localStorage.setItem("userId", data.login.userId);
 
         const remainingMilliseconds = 60 * 60 * 1000; // 1 hour
         const expiryDate = new Date(
@@ -152,28 +158,29 @@ const App = () => {
     setAuthLoading(true);
 
     const { signupForm } = authData;
+    const graphqlQuery = {
+      query: `
+      mutation { createUser(userInput: { email: "${signupForm.email.value}", password: "${signupForm.password.value}", name:" ${signupForm.name.value}"  }) { _id email name status } }
+      `,
+    };
 
-    fetch("http://localhost:3005/auth/signup", {
-      method: "PUT",
+    fetch("http://localhost:3005/graphql", {
+      method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: signupForm.email.value,
-        password: signupForm.password.value,
-        name: signupForm.name.value,
-      }),
+      body: JSON.stringify(graphqlQuery),
     })
       .then((res) => {
-        if (res.status === 422) {
+        return res.json();
+      })
+      .then((resData) => {
+        if (resData.errors && resData.errors[0].status === 422) {
           throw new Error(
             "Validation failed. Make sure the email address isn't used yet!"
           );
         }
-        if (res.status !== 200 && res.status !== 201) {
+        if (resData.errors) {
           throw new Error("Creating a user failed!");
         }
-        return res.json();
-      })
-      .then(() => {
         setAuthLoading(false);
         navigate("/", { replace: true });
       })

@@ -122,28 +122,31 @@ class Feed extends Component {
 
     formData.append("image", postData.image); // ✅ File
 
-    // Set up data (with image!)
-    let url = "http://localhost:3005/feed/posts";
-    let method = "POST";
-    if (this.state.editPost) {
-      method = "PUT";
-      url = `http://localhost:3005/feed/posts/${this.state.editPost._id}`;
-    }
+    let graphqlQ = {
+      query: `
+      mutation { 
+      createPost(postInput: { title: "${postData.title}", content: "${postData.content}", imageUrl: "some url" }) { _id title content imageUrl creator {name} createdAt} 
+      }
+      `,
+    };
 
-    fetch(url, {
-      method: method,
-      body: formData,
+    fetch("http://localhost:3005/graphql", {
+      method: "POST",
+      body: JSON.stringify(graphqlQ),
       headers: {
         Authorization: "Bearer " + this.props.token,
+        "Content-Type": "application/json",
       },
     })
       .then((res) => {
-        if (res.status !== 200 && res.status !== 201) {
-          throw new Error("Creating or editing a post failed!");
-        }
         return res.json();
       })
       .then((resData) => {
+        console.log("res data", resData);
+        if (resData.errors && resData.errors[0].status !== 422) {
+          throw new Error("Creating or editing a post failed!");
+        }
+
         const post = {
           _id: resData.post._id,
           title: resData.post.title,

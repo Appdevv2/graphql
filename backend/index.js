@@ -3,9 +3,10 @@ const path = require("path");
 const multer = require("multer");
 const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
-const qraphqlSchema = require("./graphql/schema");
-const qraphqlResolver = require("./graphql/resolver");
+const graphqlSchema = require("./graphql/schema");
+const graphqlResolver = require("./graphql/resolver");
 const { createHandler } = require("graphql-http/lib/use/express");
+const auth = require("./middleware/auth");
 
 const app = express();
 
@@ -47,15 +48,32 @@ app.use((req, res, next) => {
     "GET, POST, PUT, PATCH, DELETE, OPTIONS"
   ); // allowed methods
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization"); // allowed headers
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
   next();
 });
+
+app.use(auth);
+
+app.use(auth);
 
 app.use(
   "/graphql",
   createHandler({
-    schema: qraphqlSchema,
-    rootValue: qraphqlResolver,
+    schema: graphqlSchema,
+    rootValue: graphqlResolver,
     graphiql: true,
+
+    context: (req, res) => req,
+
+    formatError: (err) => {
+      if (!err.originalError) return err;
+      const data = err.originalError.data;
+      const message = err.message || "An error occurred.";
+      const code = err.originalError.code || 500;
+      return { message, status: code, data };
+    },
   })
 );
 

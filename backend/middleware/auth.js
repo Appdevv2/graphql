@@ -4,7 +4,8 @@ module.exports = (req, res, next) => {
   const authHeader = req.get("Authorization");
 
   if (!authHeader) {
-    return res.status(401).json({ message: "Not authenticated." });
+    req.isAuth = false;
+    return next();
   }
 
   const token = authHeader.split(" ")[1];
@@ -14,12 +15,16 @@ module.exports = (req, res, next) => {
   try {
     decodedToken = jwt.verify(token, process.env.JWT_SECRET);
   } catch (error) {
-    return res.status(500).json({ message: "Server error" });
+    req.isAuth = false;
+    return next();
   }
 
   if (!decodedToken) {
-    return res.status(401).json({ message: "Not authenticated." });
+    req.isAuth = false;
+    return next();
   }
+
   req.userId = decodedToken.userId;
+  req.isAuth = true;
   next();
 };
